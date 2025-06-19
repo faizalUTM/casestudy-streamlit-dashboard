@@ -1,41 +1,53 @@
-import streamlit as st
 import pandas as pd
+import streamlit as st
 
-st.title("Used Car Price Dashboard")
-
-# Load and clean the dataset
+# Load the processed dataset
 @st.cache_data
-def load_data():
-    df = pd.read_csv("data/used_car_dataset.csv")
-    
-    # Replace 'None' string with actual NaN
-    df['service_history'].replace("None", pd.NA, inplace=True)
-    
-    # Optional: Convert to appropriate types or categories if needed
-    return df
+def load_data(filepath="data/processed_car_dataset.csv"):
+    try:
+        return pd.read_csv(filepath)
+    except FileNotFoundError:
+        st.error("Processed dataset not found.")
+        return pd.DataFrame()
 
-df = load_data()
+# Main app function
+def main():
+    st.title("Used Car Price Dashboard")
+    st.write("Explore, search, and filter used car listings.")
 
-# --- Sidebar Filters ---
-st.sidebar.header("Filter Options")
+    data = load_data()
+    if data.empty:
+        st.warning("No data to display.")
+        return
 
-brand = st.sidebar.selectbox("Select Brand", options=["All"] + sorted(df["brand"].unique().tolist()))
-if brand != "All":
-    df = df[df["brand"] == brand]
+    # Sidebar filter section
+    st.sidebar.header("Filter Options")
 
-fuel_type = st.sidebar.selectbox("Select Fuel Type", options=["All"] + sorted(df["fuel_type"].unique().tolist()))
-if fuel_type != "All":
-    df = df[df["fuel_type"] == fuel_type]
+    # Search bar (in sidebar)
+    search_term = st.sidebar.text_input("Search by any field (brand, color, etc.):")
 
-# --- Summary Metrics ---
-st.subheader("Summary Metrics")
-st.metric("Total Cars", len(df))
-st.metric("Average Price (USD)", f"${df['price_usd'].mean():,.2f}")
+    if search_term:
+        data = data[data.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)]
 
-# --- Histogram: Price Distribution ---
-st.subheader("Price Distribution")
-st.bar_chart(df["price_usd"].value_counts().head(20).sort_index())
+    # Brand filter
+    selected_brand = st.sidebar.selectbox("Select Brand", options=sorted(data["brand"].dropna().unique()))
+    data = data[data["brand"] == selected_brand]
 
-# --- Data Table ---
-st.subheader("Filtered Car Listings")
-st.dataframe(df)
+    # Make year filter
+    year_range = st.sidebar.slider("Select Make Year Range",
+                                   min_value=int(data["make_year"].min()),
+                                   max_value=int(data["make_year"].max()),
+                                   value=(2010, 2023))
+    data = data[(data["make_year"] >= year_range[0]) & (data["make_year"] <= year_range[1])]
+
+    # Fuel type filter
+    selected_fuels = st.sidebar.multiselect("Select Fuel Type", options=sorted(data["fuel_type"].dropna().unique()))
+    if selected_fuels:
+        data = data[data["fuel_type"].isin(selected_fuels)]
+
+    # Main section: display results
+    st.subheader(f"Filtered Results ({len(data)} records)")
+    st.dataframe(data)
+
+if __name__ == "__main__":
+    main()

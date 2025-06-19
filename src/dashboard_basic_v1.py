@@ -1,22 +1,37 @@
-import streamlit as st
 import pandas as pd
+import streamlit as st
 
-st.title("Used Car Price Dashboard")
-
-# Load and clean the dataset
+# Function to load the processed data
 @st.cache_data
-def load_data():
-    df = pd.read_csv("data/used_car_dataset.csv")
-    
-    # Replace 'None' string with actual NaN
-    df['service_history'].replace("None", pd.NA, inplace=True)
-    
-    return df
+def load_data(filepath="data/processed_car_dataset.csv"):
+    try:
+        data = pd.read_csv(filepath)
+        return data
+    except FileNotFoundError:
+        st.error("Processed dataset not found. Please run the processing script first.")
+        return pd.DataFrame()
 
-df = load_data()
+# Main function for Iteration 1
+def main():
+    st.title("Used Car Price Dashboard_Simple")
+    st.write("Explore used car listings. Search by any field.")
 
-# --- Show Clean Data Table ---
-st.subheader("Cleaned Used Car Data")
-st.dataframe(df)
+    data = load_data()
+    if data.empty:
+        st.warning("No data to display. Please ensure the dataset is processed and available.")
+        return
 
+    # Display full dataset
+    st.subheader("Full Dataset")
+    st.dataframe(data)
 
+    # General search
+    st.subheader("Search Records")
+    search_term = st.text_input("Search any value (e.g., brand, fuel_type, transmission):")
+    if search_term:
+        filtered_data = data[data.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)]
+        st.write(f"Results for '{search_term}':")
+        st.dataframe(filtered_data)
+
+if __name__ == "__main__":
+    main()
